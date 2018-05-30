@@ -1,0 +1,62 @@
+sudo: false
+language: java
+jdk: openjdk8
+
+cache:
+  directories:
+    - "$HOME/.m2/repository"
+#
+# build only from "official" branches
+branches:
+  only:
+    - master
+    - development
+#
+# we can skip this step, we don't need extra software for our maven builds, for now
+install: true
+#
+# we build anything, no restrictions
+script: mvn --activate-profiles !development-build,!release-build --settings .travis.settings.xml clean cobertura:cobertura install
+#
+# generate and upload reports
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+  - mvn site
+#
+# this is what we came here for
+deploy:
+  skip_cleanup: true
+  # maven snapshot deployments
+  - provider: script
+    script: mvn --activate-profiles development-build,!release-build --settings .travis.settings.xml deploy
+    on:
+      branch: development
+      condition: "$TRAVIS_EVENT_TYPE" = "push"
+  # release deployments to maven and our test server
+  - provider: script
+    script: mvn --activate-profiles !development-build,release-build --settings .travis.settings.xml deploy &&
+            openssl aes-256-cbc -K $encrypted_79c75fc5eaa7_key -iv $encrypted_79c75fc5eaa7_iv -in travis_deployment_key.enc -out /tmp/travis_deployment_key -d &&
+            chmod 600 /tmp/travis_deployment_key &&
+            rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_deployment_key" target/*.war $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy
+    on:
+      branch: master
+      tags: true
+# 
+# always remove sensitive data
+after_deploy: rm -f /tmp/travis_deployment_key
+#
+# less spam, more productivity
+notifications:
+  email:
+    on_success: never
+    on_failure: never
+  slack:
+    on_success: never
+    on_failure: always
+
+env:
+  global:
+  - secure: XXG4QoVrYIYdT9AOrld97ojDObXH81Lb2lN5al8MkH1HWl+At9lDZRfmAqnuTEp4ot/axZHIa2mCJHkqVH6kiO1oQ13qMOYqBWdolKJUE47NcIRA1y+vBWelRm6z3uGnJN2/tSCy9vO4+NJ6vd3nkGFWmA2caXs7M1b8ldda4f2hO4Nib9pUhBiy9yHJfoEez24XUdLy5+voXPeFJmXFPr3pa5/AE1uwyqmkh3j9YT4XdWS/grPwggIcJaFqTB1Eb6U0tUSJoy7pbuXVhhcRtmaoUKIMxt5YNHOUQ7jtzY1KRZQtL1geKDzqvaHI1rUHjx5uvxUR3NVBzTRitC5ovPI6j871ifByz/V6283zGlYZt8CeschMWymdUrKJS6mFVdyZEzEjn3ImyrFLDdR02J0pdcVK0o0ZqGIq/evbqF3ON1FO7kVvuExfJRF/al+CU24AR5+liCmP1GFnS+MmL2EBvEYXuqbcju0ZF0gf8n03zyfZsfLzZnBgxlByuTzlN5LNlvfQ8dW20+J0f6LYYjXJPOHNRhaFI0CAJBVPS2pbG3BkvsqeCqIu5sHPuhF9vpgPudKFVt5LRbz2b+OLXlbZFQ6TcAvoPsYC4wxYJa+5j4PvlJTolSlXaUcPqr8veOhbORDjXF7K7jB/hzcJF9P8Yt5U0Xdf8r34lTX45jE=
+  - secure: SGacSn1LttsK5/itxcvw3NrmBg4HBCvRE4f+GAo3Fn9qcZnB7OvCaaP9jOftBAO0S5kVpzYXmx/z44cYQ28ZNbXck2JWVuKm55tCcAuZGff4Oxnt4f2DFGo1DzfD0QlsjOMsDrjzIlYhzFw4W3Jey5Gb1TMyKBEbsAycBDiLpA72VceIw4TrNETzqY+MaK+H0PyWxXZv2Z9m7DOcGHAwqREq7cccmd6YGn7yJFmZvJpdss0Xce8CUaBZiPoi79MrLg1vpIk5hJ4t+KmyZeGSS9MjlAqRLNyc4lY/rf/0ShiHGRPbbTgQ2wMOtV0TSIQVGBwIyNJdKDaNa0YJVIDqPL9JiXMXOu27WpCeXJC93z2GsthNnxrE3INAjrgmOh58Ot9zC8FHkciRCa+ssMn0sBpPamtivS9YNzrxqSJYhLNnjiiBKIr7ynovFMGYcJbtuSfe+JS0015KcMscgQrxsoaihRRrJO8A85oPKRl0TNW3JZtPKCA49ZKTA8O7ERVv+sm26JNcvFTcsJIcTw242folr2dJvYr5WVZKGgv4kWGMjw0lG8Q5OgW1ljkMqyceBDbL7W15bkuuKTBSdxNmZ0IGtpgGky+mg513HdPCIQlYoptHhUBDEdAgs6SJI1mDXqJ7/Jn6yWWSZLaTPmn+aUQFJ7RDxRNRzLU9DKJWxWQ=
+  - secure: dKDFsW3Bi4FM+/d5GRr/Yrlf0ZD/PE6c+2ThdFmM30SQzwsS139Hlne6w9Undw4iDAX+4G1R/ct2V8F2yXAcec+eeWrAagY7AA5wIJIRZVt6CeokWkDtDtNudGAeP8FYtABxHTksDIqBDVys+lQfTu6kNNan5Xpr0Fnev6nN2lm4cVk0M94J6G7KtSDLLjhkAmbjfrNIs0BTLANX3nW6xnNQ9IHYWXWzVr1Uf1Ecc7AlvAIfmpPRtkbDJkagOeaCsQgPursATC56w0/V6VrI0rbbEhxyYfdVmqUinL/Oy+kM/4G0GJK0AxeZd0VhnY6lAAC3Ru5yjOG+FAZXrTZyeeQdWbQXjVB+bCDRWK+Tg9hjewAcEafQsyvARyeUuXUwXvbuEj6DhKhnrCAjMCuI9XLOxanwGtiL1OldPKPSM52kKMyrOZI4Eh9W4e9ql0R3Up8Mzfh/F4IS+zbRN1GXnI6dwQASQH3TdpgDXFftlqfqrr2gzDFvyuXU7/BOEFi0HBgHNqhu5IDBIZRg1O8aMAV0T5bEdf7hm5AzCK5A2FatWjop8elIZS2nMVzeeaVF0Tw3Gn5IyHbxIYGog33SZSiPkymsEcsUfhu6DpJDT2INxdY15K7shELzCc3vv1/yhCBIIS8T9hA+LtnHoP9/5LVcXlNFVCmAfh0NqNUXwp0=
+  - secure: aikiSrhyxWlIA1dxzb4kME8utm4gjuYs5zQ9AdfzOaaEfDWACLP/cmJNxLUG2r2J4nSpSR/I7/FKUypQKF7r1ULKFc75YFfEkhq4LedvvxMRYQzN7N4dR8l1XIWcpBybNm3991aIZBETUgXi0WgPR9ns4CoYXfZoa1o4K9ATNEs/8GwqGYxKC25PFMhIm2wjkqrBd4UelEvDvqtmIoSu2+Lk0pzortIETUibk9RjmddUcISLlhFyoLZH0P90WKyL6/SI7sGtY1t1Kr2uIMemFfPADttxx4oJtMJaGZ1ZXK6wv5mmwu3i6kKPAUftyZy8z+XMB/jIYpTa4VLuSi3gW/Gck+jzMTcWVMluHrIb/ikP1884NEJ+QwvPLtsyTYChrtTrFwldtoZCX51g/dOdxErsJzUlFzvmETt1sn9kcb9VBAXsFpvLeU+5YmjjyVzqSi1kUo+at6lgR1K5eBKbtLZFozbyWPHErjEEN3+Iakg8FLX6tDKLXtUk8w6vS69nfIAPaRQ6vdvIomFU4kEkMDFWJOxVPcl+0UlU6IFGDLkb32lk0XRPSeR4lrdxvaCTt3DvBG8wb72YmCKnzVsdBFTQHjD9ArAVvRZDBG7pHclaz4F/W4TfMelZKA3jzYUagYoyDY0vk2N3aWPRePLN5cWcmej6jInCkZVZlIpD1cs=
