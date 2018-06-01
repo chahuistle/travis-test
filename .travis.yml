@@ -16,7 +16,19 @@ branches:
   - development
 
 # added to make logs look cleaner, crisper, certified fresh
-before_install: "unset _JAVA_OPTIONS"
+before_install: unset _JAVA_OPTIONS &&
+                if [ -z \"$encrypted_c9fdf0a9e647_key\" ];
+                then
+                  echo "key is empty";
+                else
+                  echo "key is set";
+                fi;
+                if [ -z "$encrypted_c9fdf0a9e647_iv" ];
+                then
+                  echo "iv is empty";
+                else
+                  echo "iv is set";
+                fi;
 
 # speed up builds by telling Travis that we don't need any special "installation"
 install: true
@@ -24,9 +36,11 @@ install: true
 # as agreed in our SOP, build everything (don't deploy, just try to 'mvn install' locally, which covers all phases)
 script: mvn --quiet --activate-profiles !development-build,!release-build --settings .travis.settings.xml clean cobertura:cobertura install
 # upload code coverage report, generate maven site (javadocs, documentation, static code analysis, etc.)
-after_success:
-- bash <(curl -s https://codecov.io/bash)
-- mvn --quiet --activate-profiles !development-build,!release-build --settings .travis.settings.xml site
+#after_success: 
+  #   #####################UNCOMMENT THIS!!!!!!#############################################################################
+#- bash <(curl -s https://codecov.io/bash)
+#- mvn --quiet --activate-profiles !development-build,!release-build --settings .travis.settings.xml site
+#   ########################################################################################################################
 
 # unencrypt file with sensitive information only if needed
 before_deploy: source ./.travis.decrypt.sh /tmp/travis_rsa

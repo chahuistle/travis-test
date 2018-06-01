@@ -25,7 +25,19 @@ UNENCRYPTED_FILE_DESTINATION="/tmp/travis_deployment_key"
 FILE_SEPARATOR="###-#-#-#-qbic-quick-and-dirty-file-separator-#-#-#-###"
 
 ## IMPORTANT: the variables starting with "encrypted_..." are different for every repository, make sure you edit this line
-echo "Decrypting secret sauce"
+echo "Decrypting secret sauce..."
+if [ -z "$encrypted_c9fdf0a9e647_key" ]
+then
+      echo "key is empty"
+else
+      echo "key is set"
+fi
+if [ -z "$encrypted_c9fdf0a9e647_iv" ]
+then
+      echo "iv is empty"
+else
+      echo "iv is set"
+fi
 openssl aes-256-cbc -K $encrypted_c9fdf0a9e647_key -iv $encrypted_c9fdf0a9e647_iv -in travis_deployment_key.enc -out $UNENCRYPTED_FILE_DESTINATION -d
 echo "Decryption returned $?"
 
@@ -33,7 +45,9 @@ echo "Decryption returned $?"
 FILE_SEPARATOR_LINE=`grep --line-number "$FILE_SEPARATOR" $UNENCRYPTED_FILE_DESTINATION | cut --fields 1 --delimiter=:`
 
 # we know that the first part contains a script that will set all required environment variables, we just source it as-is
+echo "Sourcing"
 source <(head --lines $(( $FILE_SEPARATOR_LINE - 1 )) $UNENCRYPTED_FILE_DESTINATION)
+echo "BOGUS_VARIABLE=$BOGUS_VALUE"
 
 # the second part of the unencrypted file contains a private key, output the last part of the unencrypted file into the desired destination
 tail --lines +$(( $FILE_SEPARATOR_LINE + 1 )) $UNENCRYPTED_FILE_DESTINATION > $RSA_PRIVATE_KEY_DESTINATION
