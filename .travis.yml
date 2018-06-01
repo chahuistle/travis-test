@@ -19,7 +19,7 @@ branches:
 install: true
 
 # as agreed in our SOP, build everything (don't deploy, just try to 'mvn install' locally, which covers all phases)
-script: mvn --activate-profiles !development-build,!release-build --settings .travis.settings.xml clean cobertura:cobertura install
+script: mvn --quiet --activate-profiles !development-build,!release-build --settings .travis.settings.xml clean cobertura:cobertura install
 # upload code coverage report, generate maven site (javadocs, documentation, static code analysis, etc.)
 after_success:
 - bash <(curl -s https://codecov.io/bash)
@@ -34,7 +34,7 @@ deploy:
   # artifact will be installed in our testing instance
 - skip_cleanup: true
   provider: script
-  script: mvn --activate-profiles development-build,!release-build --settings .travis.settings.xml deploy &&
+  script: mvn --quiet --activate-profiles development-build,!release-build --settings .travis.settings.xml deploy &&
           rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_rsa" target/*.war $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy
   on:
     branch: development
@@ -44,14 +44,14 @@ deploy:
   # artifact will be installed in our testing instance
 - skip_cleanup: true
   provider: script
-  script: mvn --activate-profiles !development-build,release-build --settings .travis.settings.xml deploy && 
+  script: mvn --quiet --activate-profiles !development-build,release-build --settings .travis.settings.xml deploy && 
           rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_rsa" target/*.war $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy
   on:
     branch: master
     tags: true
 
 # always delete sensitive information
-after_script: echo "Deleting all your secrets" && rm -f /tmp/travis_rsa
+after_script: echo \"Deleting all your secrets\" && rm -f /tmp/travis_rsa
 
 # change according to your needs, but we recommend to deactivate email notifications
 # for now, we configured Travis to send a notification to the #travis-ci channel 
