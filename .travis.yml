@@ -16,7 +16,7 @@ branches:
   - development
 
 # added to make logs look cleaner, crisper, certified fresh
-before_install: "unset _JAVA_OPTION"
+before_install: "unset _JAVA_OPTIONS"
 
 # speed up builds by telling Travis that we don't need any special "installation"
 install: true
