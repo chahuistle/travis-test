@@ -15,6 +15,9 @@ branches:
   - master
   - development
 
+# added to make logs look cleaner, crisper, certified fresh
+before_install: "unset _JAVA_OPTION"
+
 # speed up builds by telling Travis that we don't need any special "installation"
 install: true
 
@@ -23,35 +26,35 @@ script: mvn --quiet --activate-profiles !development-build,!release-build --sett
 # upload code coverage report, generate maven site (javadocs, documentation, static code analysis, etc.)
 after_success:
 - bash <(curl -s https://codecov.io/bash)
-- mvn site
+- mvn --quiet --activate-profiles !development-build,!release-build --settings .travis.settings.xml site
 
 # unencrypt file with sensitive information only if needed
-before_deploy: "source ./.travis.decrypt.sh /tmp/travis_rsa"
+before_deploy: source ./.travis.decrypt.sh /tmp/travis_rsa
 
 deploy:
   # as agreed in our SOP, builds on development branch will deploy to our maven repository after validating
   # the artifact has a proper SNAPSHOT version
-  # artifact will be installed in our testing instance
+  # artifact will be installed in our testing instance if it is a .war file
 - skip_cleanup: true
   provider: script
-  script: mvn --quiet --activate-profiles development-build,!release-build --settings .travis.settings.xml deploy &&
-          rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_rsa" target/*.war $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy
+  script: echo $BOGUS_VARIABLE && mvn --quiet --activate-profiles development-build,!release-build --settings .travis.settings.xml deploy &&
+          find target/ -name *.war -exec rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_rsa" {} $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy \;
   on:
     branch: development
     condition: '"$TRAVIS_EVENT_TYPE" = "push"'
   # as agreed in our SOP, tagging a commit on the master branch will upload to our maven repository
   # after validating the artifact has a proper release version
-  # artifact will be installed in our testing instance
+  # artifact will be installed in our testing instance if it is a .war file
 - skip_cleanup: true
   provider: script
   script: mvn --quiet --activate-profiles !development-build,release-build --settings .travis.settings.xml deploy && 
-          rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_rsa" target/*.war $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy
+          find target/ -name *.war -exec rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_rsa" {} $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy \;
   on:
     branch: master
     tags: true
 
 # always delete sensitive information
-after_script: echo \"Deleting all your secrets\" && rm -f /tmp/travis_rsa
+after_deploy: echo \"Deleting all your secrets\" && rm -f /tmp/travis_rsa
 
 # change according to your needs, but we recommend to deactivate email notifications
 # for now, we configured Travis to send a notification to the #travis-ci channel 
@@ -59,8 +62,6 @@ notifications:
   email:
     on_success: never
     on_failure: never
-  slack:
+  slack: "$SLACK_TOKEN"
     on_success: always
     on_failure: always
-    rooms:
-      - "$SLACK_TOKEN"

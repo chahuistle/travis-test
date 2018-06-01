@@ -34,7 +34,7 @@ import life.qbic.portal.Styles.NotificationType;
 
 
 /**
- * Entry point for portlet travis-tests. This class derives from {@link QBiCPortletUI}, which is found in the {@code portal-utils-lib} library.
+ * Entry point for portlet travis-test. This class derives from {@link QBiCPortletUI}, which is found in the {@code portal-utils-lib} library.
  */
 @Theme("mytheme")
 @SuppressWarnings("serial")
@@ -54,7 +54,7 @@ public class SamplePortletUI extends QBiCPortletUI {
     private static final boolean USING_QBIC_DATABASES =false;
 
     private Layout REMOVE_THIS_METHOD_AND_DO_YOUR_OWN_THING_COMMA_PLEASE(final VaadinRequest request) {
-        LOG.info("Generating content for portlet travis-tests");
+        LOG.info("Generating content for portlet travis-test");
         final StringBuilder builder = new StringBuilder("<h1><b>This is just a sample \"sanity check\" test portlet.</b></h1>");
         if (PortalUtils.isLiferayPortlet()) {
             builder.append("Hello, ").append(PortalUtils.getUser().getScreenName()).append("!<br/>");

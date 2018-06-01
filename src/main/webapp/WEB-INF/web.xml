@@ -12,7 +12,7 @@
 
 	<display-name>Sample Portlet</display-name>
 	<servlet>
-		<servlet-name>travis-tests</servlet-name>
+		<servlet-name>travis-test</servlet-name>
 		<servlet-class>com.vaadin.server.VaadinServlet</servlet-class>
 
 		<init-param>
@@ -23,7 +23,7 @@
 	</servlet>
 
 	<servlet-mapping>
-		<servlet-name>travis-tests</servlet-name>
+		<servlet-name>travis-test</servlet-name>
 		<url-pattern>/*</url-pattern>
 	</servlet-mapping>
 </web-app>

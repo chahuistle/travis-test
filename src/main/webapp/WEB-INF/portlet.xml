@@ -8,7 +8,7 @@
 
 	<portlet>
 		<description>Simple Vaadin sample portlet running on Liferay. Tests logger, openBIS connectivity, database connectivity.</description>
-		<portlet-name>travis-tests</portlet-name>
+		<portlet-name>travis-test</portlet-name>
 		<display-name>Sample Portlet</display-name>
 
 		<portlet-class>com.vaadin.server.VaadinPortlet</portlet-class>

@@ -3,7 +3,7 @@
 
 <liferay-portlet-app>
 	<portlet>
-		<portlet-name>travis-tests</portlet-name>
+		<portlet-name>travis-test</portlet-name>
 	</portlet>
 	<role-mapper>
 		<role-name>administrator</role-name>
