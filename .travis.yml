@@ -1,48 +1,66 @@
+# Build script for Travis CI
+#
 sudo: false
 language: java
 jdk: openjdk8
+
+# speed up builds by caching maven local repository
 cache:
   directories:
   - "$HOME/.m2/repository"
+
+# as agreed in our SOP
 branches:
   only:
   - master
   - development
+
+# speed up builds by telling Travis that we don't need any special "installation"
 install: true
-script: mvn --activate-profiles !development-build,!release-build --settings .travis.settings.xml
-  clean cobertura:cobertura install
+
+# as agreed in our SOP, build everything (don't deploy, just try to 'mvn install' locally, which covers all phases)
+script: mvn --activate-profiles !development-build,!release-build --settings .travis.settings.xml clean cobertura:cobertura install
+# upload code coverage report, generate maven site (javadocs, documentation, static code analysis, etc.)
 after_success:
 - bash <(curl -s https://codecov.io/bash)
 - mvn site
+
+# unencrypt file with sensitive information only if needed
+before_deploy: "source ./.travis.decrypt.sh /tmp/travis_rsa"
+
 deploy:
+  # as agreed in our SOP, builds on development branch will deploy to our maven repository after validating
+  # the artifact has a proper SNAPSHOT version
+  # artifact will be installed in our testing instance
 - skip_cleanup: true
   provider: script
-  script: mvn --activate-profiles development-build,!release-build --settings .travis.settings.xml
-    deploy
+  script: mvn --activate-profiles development-build,!release-build --settings .travis.settings.xml deploy &&
+          rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_rsa" target/*.war $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy
   on:
     branch: development
     condition: '"$TRAVIS_EVENT_TYPE" = "push"'
+  # as agreed in our SOP, tagging a commit on the master branch will upload to our maven repository
+  # after validating the artifact has a proper release version
+  # artifact will be installed in our testing instance
 - skip_cleanup: true
   provider: script
   script: mvn --activate-profiles !development-build,release-build --settings .travis.settings.xml deploy && 
-          openssl aes-256-cbc -K $encrypted_c9fdf0a9e647_key -iv $encrypted_c9fdf0a9e647_iv -in travis_deployment_key.enc -out /tmp/travis_deployment_key -d && 
-          chmod 600 /tmp/travis_deployment_key && 
-          rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_deployment_key" target/*.war $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy
+          rsync --verbose -e "ssh -o StrictHostKeyChecking=no" -e "ssh -i /tmp/travis_rsa" target/*.war $TESTING_USERNAME@$TESTING_SERVER:~/liferay*/deploy
   on:
     branch: master
     tags: true
-after_deploy: rm -f /tmp/travis_deployment_key
+
+# always delete sensitive information
+after_script: echo "Deleting all your secrets" && rm -f /tmp/travis_rsa
+
+# change according to your needs, but we recommend to deactivate email notifications
+# for now, we configured Travis to send a notification to the #travis-ci channel 
 notifications:
   email:
     on_success: never
     on_failure: never
   slack:
-    on_success: never
+    on_success: always
     on_failure: always
-env:
-  global:
-  - secure: OHH8JA6BrkEVe2MxF3rYbSVIQNVYnU+oDQhQJxp/vKlTCQ9rGza0VU6/uZr2E1NRBrJoh56bxeaOpzj5dY6N7esvVBk4NYvfsrdHehZBBKJDhwQsytycgd+8VeysFZSY08JnCTOOa1M6sBgwhldNHuHa3bPgKEPYBQq9UZRH6Uvzjp3O5uGlbGwKJLQQkDRrSmgcLrh4shA6apGZxFsMgoSh/UjuCvCnB7eJwMc9PdgbtgrwmtbxlBqrNoXupwYImkIOGHs7qVBnZ8bTCXQ8G0aM8LbmpcD7ASE1F5BnYo9+cy2pH7xW1ihp8eNF+7gGUw9b2qOD1rqTsPNN+tcVBPw8fRXRPe5+Zxk8/hvu1Dp6HjcSVnt3BnX/whdS4I0AYUrq4rAQjLxVlH/4Ji/dnSvaq2x/vP6762dSK4Fsj21y7QVs1UhkbJXc6aQEp0ImD/OK07li4DbPdRIKQRFiX4gpX1aEMBIjq71mUdtPmLLsX1SeKO/CzL9PjvuvnLZ2CSL3hd1YcPbT8LfpbmvvST3XlBN8P6JTVSKvv8vKvb8MGHvQ+BKi5Q01WiGoIquom0MiLhtOyJSWsI34HK/jSoUfDVEVqzceF2wPltapLGtrQevEsl5cayAJsjunxTJlpiSnRmLRDmg+13iDBS0iNSxhbw3XziSMGQ6uTHNSnuI=
-  - secure: HU+zgFhnFuWWsyWJ/9MQAAEuIfyrSf9qeiFyWKrYYPluecYRClOyYrPlkAwkFjas+Sl7EWnB2nJI9bA9f9BpzsAfwAH7UsLF9GvbHUA9V7yeovGG0EzrorHjhYlRTzxF8Vp3NbNsZcLdoT0bmmfM6RazbfNHPtn8yVP8erKCA9hYddNxWYZJizD+FFA4W+BAK2690dJ/0VYWJIP7CAarA66l/0UJuFV6/cwnx0mKrx8s43EG5SIfi2YdYYahyt3UEdttM779IHcifbxJXeCPB8mUf7JHhmKWJoF1WG5GDtLC4k3IQ35TZz6BSQgwVSmP0QZU9AVof9xMtVgwb3HBtu4F5U/srHJYMRBclRqs6RJeaM4KxgyHoUm8F1ck+m69F2HmCf2C1Glw6wd7Oxrp2aAQwF97z5RqaMRXXOa7kOvEL/MLoZWC6ok//is6nsEi/2JIjR9BDxiEjmrU+MWThr0W0jor5Y7Xixo/ThR8Ep+wrPqeKM1+IS7lr3HjeBgDY7AFJUPeVlRH30LeYEAcE7IxTlATh26o2s+alcyXAE056wNbLG9mC2r3vyJ+VjGBSWMXBdTHJR4Lcew9+lM2LRR7RFwT7KvwSh1FKTX0czyoVkd+iYfAviTVFMEhd3tG8PSLk/IdrNeTT5xPX7K0cGLHSIk/kWlhfxzhrQONC+w=
-  - secure: jb/YlSEwS9PAFPErZRWQWVhSOV8xTdqkV0/wfISq92pAJZPcNCWqY63f59sWTZZTeqWxKXB9DG2WXPZ7LjHfwEZoR9c/Ip/J7UhdAUPjkGhAsCZbB+IYUFC+MXOOstN5H0p6Zduo9ZhGPisvWjOgR/Obb1BUCSdoxRaLFcipjyYP5MjgR32R/c4I5W8p1Q3unYp3nZBb/lBIC1enIbjTHfH2S2Hq5+QTXrJoCdVdiehl6ttPjnKfLNsR2MPri0da5Vf4qk3K0bMO01UWuvCpxfLWJuauCL6I1rdOe6k6GSzdethrrTyoq089R8aj1zzrjeWKm0Yt8rruy0wLQfsxp+HQELnBNcucrdQoXv0CXM25OlFJdNFssHiMVS0wiA//FV2G27/llRMqqIIOruhbfn7dG4ePl2ooG1vwgWXA+mqyL//bPWDnrDDSy9q6OvQtIe+tDs3G4mBNXdOhy2RQw+NRuAclcvkYfFpdK+20cWNLafcHOBXVo2c2d/ucS790QxyhlD+pgR0lKngs9MEoLSSkJ2SLQQK0vNhABM7CWGRnMjUCbG7pJ7LWWBz77O9sEQ6lPTkP/ttDlnIV5M3cJ1zRCl4Y5sr6jOpA5V6lTq9FPgnV9i1Jbj5ZUFRYenepYkSMawLtjjl03rmO3L/r5yWBtGXNaG0TUgxSgemgIww=
-  - secure: Wr9YGLcsCVzfvJ3cuRIgVniwkglZ+xr54r0+DzuB01g0FzShioZ5AogygrPlMbffxOWIHoV+776qINTPYi3ecJCWpuwObRTpGhh7oh1mkg6HBgVMzxOEETIzkhFq+3tDyOhKkzfhXHkI1nVk2T+vDvqyYNQSnFI1Cw3+11HwhSAB2JXlw49lgoSQZA6mmNvrnnApjRVY4VGJV31OGGMFoyk2mTQkNeI1stG1YXnfkKUtI983OGIvDWfMpWSOj736XIVeDvi8yBgjJ+KcbTL6SrlXA0n5rCoVBxqS3ni8PIkTVz1IQ8RKw1IXt2o5kOXkWEgwflDM0Sy/edEeS5ORTQNnikZ2Y+BTxXb+Ah5xWKWPVEMsJULphyo/V0jlOWruKpYflHq4VqYH7THnHuVGWQrwb/z97HGQyBhXHu142BXYImMBVndz70YpvLR6Pfs7a6QunsRLq4CYhaWtDQldGqNZiicQrA3sAjA/VsaPCy6RArBGFQaxfpPtQAW7A/mkBOh3iJp+Jj2mrehDzb5L1NufsGKdNl/SArHGx/6/wJgK5khGOYDyUZxKN7buhOVi3w6N0r8pM2wt/6NC3uuLDYfhVVYWvm7fmZzLsmpFSjXsJ+uV8lAdBJW/R6/hsA6qRlRyKArhTPD03KFU7w/KRCFR9QQ/PY6pcOdwaJ7HuT8=
-
+    rooms:
+      - "$SLACK_TOKEN"
