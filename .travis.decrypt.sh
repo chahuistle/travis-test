@@ -25,7 +25,9 @@ UNENCRYPTED_FILE_DESTINATION="/tmp/travis_deployment_key"
 FILE_SEPARATOR="###-#-#-#-qbic-quick-and-dirty-file-separator-#-#-#-###"
 
 ## IMPORTANT: the variables starting with "encrypted_..." are different for every repository, make sure you edit this line
+echo "Decrypting secret sauce"
 openssl aes-256-cbc -K $encrypted_c9fdf0a9e647_key -iv $encrypted_c9fdf0a9e647_iv -in travis_deployment_key.enc -out $UNENCRYPTED_FILE_DESTINATION -d
+echo "Decryption returned $?"
 
 # find in which line is our file separator
 FILE_SEPARATOR_LINE=`grep --line-number "$FILE_SEPARATOR" $UNENCRYPTED_FILE_DESTINATION | cut --fields 1 --delimiter=:`
